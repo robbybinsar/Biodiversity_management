@@ -1,0 +1,496 @@
+---
+title: "Analysis results"
+author: "Robby Butarbutar"
+date: "2024-08-27"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Load packages**
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(openxlsx)
+library(dplyr)
+library(plyr)
+library(vegan)
+library(ggplot2)
+library(gridExtra)
+library(pairwiseAdonis)
+library(indicspecies)
+library(geometry)
+library(plotly)
+```
+
+*Analysis across habitats*
+
+**Reading and preparing data**
+
+The abundace data is pooled by landscapes, transects and clusters (Habitat)
+
+```{r}
+# Read in the Excel file
+df <- read.xlsx("C:/Users/Robby Butarbutar/OneDrive - University of Kent/PhD/Field Data/bird_survey_sulawesi_2024.xlsx", 
+                  sheet = "PC_v3")
+  
+# Remove swift (Apodidae)
+  df_filtered <- df %>% filter(Family != "Apodidae")
+
+# Endemic/non-endemic dataset
+  df_filtered <- df_filtered %>% filter(ENDEMIC == "NO")
+  
+  #pooled by habitat clusters
+    df_transformed <- df_filtered %>%
+      group_by(LANDSCAPE, TRANSECT, CLUSTER, HABITAT, ENGLISH_NAME) %>%
+      dplyr::summarise(Total_count = sum(COUNT, na.rm = TRUE)) %>%
+      pivot_wider(names_from = ENGLISH_NAME, values_from = Total_count, values_fill = 0)
+    # Set rownames as POINTID
+    df_transformed$row.id <- paste(df_transformed$LANDSCAPE, df_transformed$TRANSECT,
+                                   df_transformed$CLUSTER, sep = "_")
+    df_transformed <- column_to_rownames(df_transformed, var = "row.id")
+    df_final <- df_transformed[,-c(1:4)]
+    
+# Log transformation
+  sp_site <- log1p(df_final)
+    
+```
+
+
+**Non-metric Multidimensional Scale (NMDS)**
+
+```{r}
+# Create a distance matrix
+data_dist <- vegdist(sp_site, method = "bray")
+
+# Perform NMDS
+NMDS <- metaMDS(data_dist, trymax =250, k = 3)
+
+# Extract NMDS coordinates and create a data frame
+NMDS_df <- merge(data.frame(NMDS$points),
+                 df_transformed[,c("LANDSCAPE", "HABITAT")], 
+                 by.x = "row.names",by.y = "row.names", all.x = T)
+rownames(NMDS_df) <- NMDS_df$Row.names
+NMDS_df <- NMDS_df[, -1]
+names(NMDS_df)[4:5] <- c("site", "habitat")
+
+NMDS
+
+```
+
+**Visualise NMDS points**
+
+```{r}
+# Function to calculate convex hull for 3D points
+compute_convex_hull <- function(df) {
+  ch <- convhulln(as.matrix(df[, c("MDS1", "MDS2", "MDS3")]))
+  df[ch, ]
+}
+
+# Calculate convex hulls for each habitat
+hull_Coconut <- compute_convex_hull(NMDS_df[NMDS_df$habitat == "Coconut", ])
+hull_Coconut_near_forest <- compute_convex_hull(NMDS_df[NMDS_df$habitat == "Coconut near forest", ])
+hull_Forest <- compute_convex_hull(NMDS_df[NMDS_df$habitat == "Forest", ])
+
+# 3D Plot with convex hulls
+plot_3d <- plot_ly(NMDS_df, x = ~MDS1, y = ~MDS2, z = ~MDS3, 
+                   color = ~habitat, colors = c("Coconut" = "#800080", 
+                                                "Forest" = "olivedrab", 
+                                                "Coconut near forest" = "#1E90FF"),
+                   #symbol = ~as.factor(site), symbols = c(6, 19, 17, 10), 
+                   marker = list(size = 5)) %>%
+  add_markers() %>%
+  add_trace(data = hull_Coconut, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, facecolor = rep("#800080", 36), name = "Coconut") %>%
+  add_trace(data = hull_Coconut_near_forest, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, facecolor = rep("#1E90FF", 36), name = "Coconut near forest") %>%
+  add_trace(data = hull_Forest, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, facecolor = rep("olivedrab", 36), name = "Forest") %>%
+  layout(scene = list(xaxis = list(title = 'MDS1'),
+                      yaxis = list(title = 'MDS2'),
+                      zaxis = list(title = 'MDS3'),
+                      legend = list(title = list(text = 'Habitat type'))))
+# Show plot
+plot_3d
+```
+
+**Adonis**
+
+```{r}
+#ADONIS 
+
+adon2<-adonis2(df_final ~ HABITAT, data=df_transformed)
+adon2
+pairwise_results <- pairwise.adonis(df_final, df_transformed$HABITAT)
+print(pairwise_results)
+```
+
+**Indicator species analysis**
+
+```{r}
+##indicatior species analysis
+indval<-multipatt(sp_site, df_transformed$HABITAT, func="IndVal.g", duleg=F,
+                  #restcomb = c(3,4),
+                  control=how(nperm=999))
+
+summary(indval)
+
+```
+
+
+*Analysis across crop setting in coconut farms (BY CLUSTER)*
+
+**Reading and preparing data**
+
+```{r}
+# Read in the Excel file
+df <- read.xlsx("C:/Users/Robby Butarbutar/OneDrive - University of Kent/PhD/Field Data/bird_survey_sulawesi_2024_9SEP24.xlsx", 
+                  sheet = "PC_v3")
+  
+# Remove swift (Apodidae)
+  df_filtered <- df %>% filter(Family != "Apodidae")
+  
+  #subset data coconut only
+  #df_filtered <- df_filtered %>% filter(HABITAT != "Forest")
+  
+  # Endemic/non-endemic dataset
+  #df_filtered <- df_filtered %>% filter(ENDEMIC == "NO")
+    
+  # Transform into appropriate format for analysis
+  # pooled by crop setting
+  df_transformed <- df_filtered %>%
+    group_by(LANDSCAPE, TRANSECT, CLUSTER, Crop_setting, ENGLISH_NAME) %>%
+    dplyr::summarise(Total_count = sum(COUNT, na.rm = TRUE)) %>%
+    pivot_wider(names_from = ENGLISH_NAME, values_from = Total_count, values_fill = 0)
+  # Set rownames as POINTID
+  df_transformed$row.id <- paste(substr(df_transformed$LANDSCAPE, 1, 2), 
+                                 df_transformed$TRANSECT,
+                                 df_transformed$CLUSTER,
+                                 substr(df_transformed$Crop_setting, 1, 2),
+                                 sep = "_")
+  df_transformed <- column_to_rownames(df_transformed, var = "row.id")
+    # merge column crop setting and cluster
+  df_transformed$CLUSTER <- ifelse(df_transformed$CLUSTER == 2, "NF", "")
+  df_transformed$CROP_SETTING <- ifelse(df_transformed$CLUSTER == "NF", 
+                                        paste(df_transformed$Crop_setting, df_transformed$CLUSTER), 
+                                 df_transformed$CROP_SETTING <- df_transformed$Crop_setting)
+  df_transformed <- df_transformed[, -which(names(df_transformed) %in% c("CLUSTER"))]
+  #df_transformed <- column_to_rownames(df_transformed, var = "POINTID")
+  df_final <- df_transformed[,-which(names(df_transformed) %in% c("CROP_SETTING", "LANDSCAPE", "TRANSECT", "Crop_setting"))]
+  
+  # Log transformation
+  sp_site <- log1p(df_final)
+  
+
+```
+
+
+**Non-metric Multidimensional Scale (NMDS)**
+
+```{r}
+# Create a distance matrix
+data_dist <- vegdist(sp_site, method = "bray")
+
+# Perform NMDS
+NMDS <- metaMDS(data_dist, trymax =250, k = 3)
+
+# Extract NMDS coordinates and create a data frame
+NMDS_df <- merge(data.frame(NMDS$points),
+                 df_transformed[,c("LANDSCAPE", "CROP_SETTING","Crop_setting")], 
+                 by.x = "row.names",by.y = "row.names", all.x = T)
+rownames(NMDS_df) <- NMDS_df$Row.names
+NMDS_df <- NMDS_df[, -1]
+#names(NMDS_df)[4:5] <- c("site", "crop_setting")
+
+NMDS
+
+```
+
+**Visualise NMDS points**
+
+```{r}
+library(patchwork)
+
+# Function to calculate convex hull for 2D points
+compute_convex_hull_2D <- function(df, x, y) {
+  ch <- chull(df[[x]], df[[y]])
+  df[ch, ]
+}
+
+plot_mds <- function(MDSX, MDSY) {
+# Calculate convex hulls for each habitat on different planes
+# Plane: MDS1 vs MDS2
+hull_MONO_12 <- compute_convex_hull_2D(NMDS_df[NMDS_df$Crop_setting == "MONO", ], MDSX, MDSY)
+hull_INTERCROP_12 <- compute_convex_hull_2D(NMDS_df[NMDS_df$Crop_setting == "INTERCROP", ], MDSX, MDSY)
+hull_FOREST_12 <- compute_convex_hull_2D(NMDS_df[NMDS_df$Crop_setting == "FOREST", ], MDSX, MDSY)
+
+# Plot for MDS1 vs MDS2
+plotmds <- ggplot(NMDS_df, aes(x = .data[[MDSX]], y = .data[[MDSY]], col = Crop_setting)) +
+  geom_polygon(data = rbind(hull_MONO_12, hull_INTERCROP_12, hull_FOREST_12), aes(fill = Crop_setting, group = Crop_setting), alpha = 0.2) +
+  geom_point(cex = 3, stroke = 0.5) +
+  scale_color_manual(values = c("FOREST" = "olivedrab", "INTERCROP" = "#7050FF", "MONO" ="#654321"), name = "Habitat type") +
+  scale_fill_manual(values = c("FOREST" = "olivedrab", "INTERCROP" = "#7050FF", "MONO" ="#654321"), name = "Habitat type") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(size = 7),   
+        axis.text.y = element_text(size = 7),   
+        axis.title.x = element_text(size = 10),  
+        axis.title.y = element_text(size = 10),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10)) 
+  #labs(title = "MDS1 vs MDS2")
+
+print(plotmds)
+}
+
+combined_plot <- (plot_mds("MDS1", "MDS2") | plot_mds("MDS1", "MDS3") | plot_mds("MDS2", "MDS3")) + plot_layout(guides = "collect", axis_titles = "keep")
+combined_plot
+
+```
+
+
+# Function to calculate convex hull for 3D points
+compute_convex_hull <- function(df) {
+  ch <- convhulln(as.matrix(df[, c("MDS1", "MDS2", "MDS3")]))
+  df[ch, ]
+}
+
+
+# Calculate convex hulls for each habitat (including NF)
+hull_MONO_nearforest <- compute_convex_hull(NMDS_df[NMDS_df$CROP_SETTING == "MONO NF", ])
+hull_MONO <- compute_convex_hull(NMDS_df[NMDS_df$CROP_SETTING == "MONO", ])
+hull_INTERCROP_nearforest <- compute_convex_hull(NMDS_df[NMDS_df$CROP_SETTING == "INTERCROP NF", ])
+hull_INTERCROP <- compute_convex_hull(NMDS_df[NMDS_df$CROP_SETTING == "INTERCROP", ])
+hull_FOREST <- compute_convex_hull(NMDS_df[NMDS_df$CROP_SETTING == "FOREST",])
+
+# Calculate convex hulls for each habitat
+hull_MONO <- compute_convex_hull(NMDS_df[NMDS_df$Crop_setting == "MONO", ])
+hull_INTERCROP <- compute_convex_hull(NMDS_df[NMDS_df$Crop_setting == "INTERCROP", ])
+hull_FOREST <- compute_convex_hull(NMDS_df[NMDS_df$Crop_setting == "FOREST",])
+
+# 3D Plot with convex hulls (including NF)
+plot_3d <- plot_ly(NMDS_df, x = ~MDS1, y = ~MDS2, z = ~MDS3, 
+                   color = ~CROP_SETTING, colors = c("MONO" = "#654321", "MONO NF"="#898022",
+                                                "INTERCROP" = "#7050FF", "INTERCROP NF" = "#9100FF",
+                                                "FOREST" = "olivedrab"),
+                   #symbol = ~as.factor(CLUSTER), symbols = c(6, 19, 17), 
+                   marker = list(size = 5)) %>%
+  add_markers() %>%
+  add_trace(data = hull_MONO, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, facecolor = rep("#654321", 54), showlegend=F, name = "Monocrop") %>%
+  add_trace(data = hull_MONO_nearforest, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, facecolor = rep("#898022", 54),showlegend = F, name = "Monocrop near forest") %>%
+  add_trace(data = hull_INTERCROP, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, name = "Intercrop", showlegend = F, facecolor = rep("#7050FF", 54))%>%
+  add_trace(data = hull_INTERCROP_nearforest, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, name = "Intercrop near forest", showlegend = F, facecolor = rep("#9100FF", 54)) %>%
+  add_trace(data = hull_FOREST, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, name = "Forest", showlegend = F, facecolor = rep("olivedrab", 54)) %>%
+  layout(scene = list(xaxis = list(title = 'MDS1'),
+                      yaxis = list(title = 'MDS2'),
+                      zaxis = list(title = 'MDS3'),
+                      legend = list(title = list(text = 'Crop setting'))))
+# Show plot
+plot_3d
+
+# 3D Plot with convex hulls
+plot_3d <- plot_ly(NMDS_df, x = ~MDS1, y = ~MDS2, z = ~MDS3, 
+                   color = ~Crop_setting, colors = c("MONO" = "#654321",
+                                                "INTERCROP" = "#7050FF",
+                                                "FOREST" = "olivedrab"),
+                   #symbol = ~as.factor(CLUSTER), symbols = c(6, 19, 17), 
+                   marker = list(size = 5)) %>%
+  add_markers() %>%
+  add_trace(data = hull_MONO, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, facecolor = rep("#654321", 54), showlegend=F, name = "Monocrop") %>%
+  add_trace(data = hull_INTERCROP, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, name = "Intercrop", showlegend = F, facecolor = rep("#7050FF", 54))%>%
+  add_trace(data = hull_FOREST, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, name = "Forest", showlegend = F, facecolor = rep("olivedrab", 54)) %>%
+  layout(scene = list(xaxis = list(title = 'MDS1'),
+                      yaxis = list(title = 'MDS2'),
+                      zaxis = list(title = 'MDS3'),
+                      legend = list(title = list(text = 'Crop setting'))))
+# Show plot
+plot_3d
+
+**Adonis**
+
+```{r}
+#ADONIS 
+adon2<-adonis2(df_final ~ Crop_setting, data=df_transformed)
+adon2
+pairwise_results <- pairwise.adonis(df_final, df_transformed$Crop_setting)
+print(pairwise_results)
+```
+
+**Indicator species analysis**
+
+```{r}
+##indicatior species analysis
+indval<-multipatt(df_final, df_transformed$Crop_setting, func="r.g", duleg=F,
+                  #restcomb = c(3,4),
+                  control=how(nperm=999))
+
+summary(indval)
+
+```
+
+
+
+*Analysis across crop setting in coconut farms (BY POINT)*
+
+**Reading and preparing data**
+
+```{r}
+# Read in the Excel file
+df <- read.xlsx("C:/Users/Robby Butarbutar/OneDrive - University of Kent/PhD/Field Data/bird_survey_sulawesi_2024_9SEP24.xlsx", 
+                  sheet = "PC_v3")
+  
+# Remove swift (Apodidae)
+  df_filtered <- df %>% filter(Family != "Apodidae")
+  
+  #subset data coconut only
+  #df_filtered <- df_filtered %>% filter(HABITAT != "Forest")
+  
+  # Endemic/non-endemic dataset
+  #df_filtered <- df_filtered %>% filter(ENDEMIC == "YES")
+    
+  # Transform into appropriate format for analysis
+  # pooled by crop setting
+  df_transformed <- df_filtered %>%
+    group_by(LANDSCAPE, TRANSECT, CLUSTER ,POINTID, Crop_setting, ENGLISH_NAME) %>%
+    dplyr::summarise(Total_count = sum(COUNT, na.rm = TRUE)) %>%
+    pivot_wider(names_from = ENGLISH_NAME, values_from = Total_count, values_fill = 0)
+  # Set rownames as POINTID
+  df_transformed <- column_to_rownames(df_transformed, var = "POINTID")
+    # merge column crop setting and cluster
+  df_transformed$CLUSTER <- ifelse(df_transformed$CLUSTER == 2, "NF", "")
+  df_transformed$CROP_SETTING <- ifelse(df_transformed$CLUSTER == "NF", 
+                                        paste(df_transformed$Crop_setting, df_transformed$CLUSTER), 
+                                 df_transformed$CROP_SETTING <- df_transformed$Crop_setting)
+  df_transformed <- df_transformed[, -which(names(df_transformed) %in% c("CLUSTER"))]
+  #df_transformed <- column_to_rownames(df_transformed, var = "POINTID")
+  df_final <- df_transformed[,-which(names(df_transformed) %in% c("CROP_SETTING", "LANDSCAPE", "TRANSECT", "Crop_setting"))]
+  
+  # Log transformation
+  sp_site <- log1p(df_final)
+  
+
+```
+
+
+**Non-metric Multidimensional Scale (NMDS)**
+
+```{r}
+# Create a distance matrix
+data_dist <- vegdist(sp_site, method = "bray")
+
+# Perform NMDS
+NMDS <- metaMDS(data_dist, trymax =250, k = 3)
+
+# Extract NMDS coordinates and create a data frame
+NMDS_df <- merge(data.frame(NMDS$points),
+                 df_transformed[,c("LANDSCAPE", "CROP_SETTING","Crop_setting")], 
+                 by.x = "row.names",by.y = "row.names", all.x = T)
+rownames(NMDS_df) <- NMDS_df$Row.names
+NMDS_df <- NMDS_df[, -1]
+#names(NMDS_df)[4:5] <- c("site", "crop_setting")
+
+NMDS
+
+```
+
+**Visualise NMDS points**
+
+```{r}
+# Function to calculate convex hull for 3D points
+compute_convex_hull <- function(df) {
+  ch <- convhulln(as.matrix(df[, c("MDS1", "MDS2", "MDS3")]))
+  df[ch, ]
+}
+
+
+# Calculate convex hulls for each habitat (including NF)
+hull_MONO_nearforest <- compute_convex_hull(NMDS_df[NMDS_df$CROP_SETTING == "MONO NF", ])
+hull_MONO <- compute_convex_hull(NMDS_df[NMDS_df$CROP_SETTING == "MONO", ])
+hull_INTERCROP_nearforest <- compute_convex_hull(NMDS_df[NMDS_df$CROP_SETTING == "INTERCROP NF", ])
+hull_INTERCROP <- compute_convex_hull(NMDS_df[NMDS_df$CROP_SETTING == "INTERCROP", ])
+hull_FOREST <- compute_convex_hull(NMDS_df[NMDS_df$CROP_SETTING == "FOREST",])
+
+# Calculate convex hulls for each habitat
+hull_MONO <- compute_convex_hull(NMDS_df[NMDS_df$Crop_setting == "MONO", ])
+hull_INTERCROP <- compute_convex_hull(NMDS_df[NMDS_df$Crop_setting == "INTERCROP", ])
+hull_FOREST <- compute_convex_hull(NMDS_df[NMDS_df$Crop_setting == "FOREST",])
+
+# 3D Plot with convex hulls (including NF)
+plot_3d <- plot_ly(NMDS_df, x = ~MDS1, y = ~MDS2, z = ~MDS3, 
+                   color = ~CROP_SETTING, colors = c("MONO" = "#654321", "MONO NF"="#898022",
+                                                "INTERCROP" = "#7050FF", "INTERCROP NF" = "#9100FF",
+                                                "FOREST" = "olivedrab"),
+                   #symbol = ~as.factor(CLUSTER), symbols = c(6, 19, 17), 
+                   marker = list(size = 5)) %>%
+  add_markers() %>%
+  add_trace(data = hull_MONO, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, facecolor = rep("#654321", 54), showlegend=F, name = "Monocrop") %>%
+  add_trace(data = hull_MONO_nearforest, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, facecolor = rep("#898022", 54),showlegend = F, name = "Monocrop near forest") %>%
+  add_trace(data = hull_INTERCROP, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, name = "Intercrop", showlegend = F, facecolor = rep("#7050FF", 54))%>%
+  add_trace(data = hull_INTERCROP_nearforest, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, name = "Intercrop near forest", showlegend = F, facecolor = rep("#9100FF", 54)) %>%
+  add_trace(data = hull_FOREST, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, name = "Forest", showlegend = F, facecolor = rep("olivedrab", 54)) %>%
+  layout(scene = list(xaxis = list(title = 'MDS1'),
+                      yaxis = list(title = 'MDS2'),
+                      zaxis = list(title = 'MDS3'),
+                      legend = list(title = list(text = 'Crop setting'))))
+# Show plot
+plot_3d
+
+# 3D Plot with convex hulls
+plot_3d <- plot_ly(NMDS_df, x = ~MDS1, y = ~MDS2, z = ~MDS3, 
+                   color = ~Crop_setting, colors = c("MONO" = "#654321",
+                                                "INTERCROP" = "#7050FF",
+                                                "FOREST" = "olivedrab"),
+                   #symbol = ~as.factor(CLUSTER), symbols = c(6, 19, 17), 
+                   marker = list(size = 5), showlegend=T) %>%
+  add_markers() %>%
+  add_trace(data = hull_MONO, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, facecolor = rep("#654321", 54), showlegend=F, name = "Monocrop") %>%
+  add_trace(data = hull_INTERCROP, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, name = "Intercrop", showlegend = F, facecolor = rep("#7050FF", 54))%>%
+  add_trace(data = hull_FOREST, x = ~MDS1, y = ~MDS2, z = ~MDS3,
+            type = "mesh3d", opacity = 0.2, alphahull = 0, name = "Forest", showlegend = F, facecolor = rep("olivedrab", 54)) %>%
+  layout(scene = list(xaxis = list(title = 'MDS1'),
+                      yaxis = list(title = 'MDS2'),
+                      zaxis = list(title = 'MDS3'),
+                      legend = list(title = list(text = 'Crop setting'))))
+# Show plot
+plot_3d
+
+```
+
+**Adonis**
+
+```{r}
+#ADONIS 
+adon2<-adonis2(df_final ~ Crop_setting, data=df_transformed)
+adon2
+pairwise_results <- pairwise.adonis(df_final, df_transformed$Crop_setting)
+print(pairwise_results)
+```
+
+**Indicator species analysis**
+
+```{r}
+##indicatior species analysis
+indval<-multipatt(df_final, df_transformed$Crop_setting, func="r.g", duleg=F,
+                  #restcomb = c(3,4),
+                  control=how(nperm=999))
+
+summary(indval)
+
+```
+
