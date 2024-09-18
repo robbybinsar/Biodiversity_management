@@ -4,7 +4,7 @@ library(seewave)
 #Acoustic Complexity Index (ACI)
 
   #Load file as an object called soundfile
-  soundfile <- readWave("C:/Users/Robby Butarbutar/OneDrive - University of Kent/PhD/Audiomoth/Pilot testing/Binerean/Audio 10 Binerean-Research Station/20240308/20240308_152000.WAV")
+  soundfile <- readWave("/home/rb857/AUDIO/LOLAYAN/LOT01/C1/LOT01C101/20240525/20240525_061723.WAV")
   
   #Delete the downloaded wave file
   #unlink("SM87_20080420_000000_10.wav")
@@ -35,15 +35,14 @@ library(seewave)
   
 #Acoustic Evenness Index (AEI)
   soundfile.aei <- acoustic_evenness(soundfile, max_freq = 12000)
-  print(result$aei_left)
+  print(soundfile.aei$aei_left)
   
-  summary(result)
+  summary(soundfile.aei)
   
 #Analysis of many files
-  multiple_sounds(directory = "C:/Users/Robby Butarbutar/OneDrive - University of Kent/PhD/Audiomoth/Pilot testing/Binerean/Audio 4 Binerean-Agroforestry/20240309", 
-                              ,resultfile = "C:/Users/Robby Butarbutar/OneDrive - University of Kent/PhD/Audiomoth/Pilot testing/Binerean/Audio 4 Binerean-Agroforestry/20240309/NDSI_20240309_agr.csv",
-                              soundindex = "ndsi", anthro_min = 500, anthro_max = 1000,
-                  bio_min = 1000, bio_max = 12000)
+multiple_sounds(directory = "/home/rb857/AUDIO/BINEREAN/BIT01/C1/BIT01C102/20240516/",
+                resultfile = "/home/rb857/AUDIO/BINEREAN/BIT01/C1/BIT01C102/20240516/result.csv",
+                              soundindex = "acoustic_complexity", no_cores = "max", max_freq = 12000, j= 10)
 
   #Analysis of many files (H entropy)
   
