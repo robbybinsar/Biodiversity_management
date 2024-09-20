@@ -1,10 +1,12 @@
 library(soundecology)
 library(seewave)
+library(tuneR)
+library(stringr)
 
 #Acoustic Complexity Index (ACI)
 
   #Load file as an object called soundfile
-  soundfile <- readWave("/home/rb857/AUDIO/LOLAYAN/LOT01/C1/LOT01C101/20240525/20240525_061723.WAV")
+  soundfile <- readWave("/home/rb857/AUDIO/BINEREAN/BIT01/C1/BIT01C102/20240516/20240516_054521.WAV")
   
   #Delete the downloaded wave file
   #unlink("SM87_20080420_000000_10.wav")
@@ -39,11 +41,69 @@ library(seewave)
   
   summary(soundfile.aei)
   
+  
+#check faulty wav files
+  # Directory containing the .wav files
+  directory <- "/home/rb857/AUDIO/LOLAYAN"
+  
+  # List all .wav files
+  wav_files <- list.files(path = directory, pattern = "*.WAV$", full.names = TRUE, recursive = T)
+  
+  # Get file sizes
+  file_info <- file.info(wav_files)
+  file_sizes <- file_info$size
+  
+  # Define the size limit in bytes
+  size_limit <- 100 * 1024  # 100 KB in bytes
+  
+  # Find files smaller than the size limit
+  small_files <- wav_files[file_sizes < size_limit]
+  
+  # Print the small files
+  print(small_files)
+  
 #Analysis of many files
-multiple_sounds(directory = "/home/rb857/AUDIO/BINEREAN/BIT01/C1/BIT01C102/20240516/",
-                resultfile = "/home/rb857/AUDIO/BINEREAN/BIT01/C1/BIT01C102/20240516/result.csv",
-                              soundindex = "acoustic_complexity", no_cores = "max", max_freq = 12000, j= 10)
+  
+acoustic_indices <- function(index, folder_main) {
+  count_levels <- function(path) {
+    # Count the number of slashes in the path
+    length(str_split(path, "/", simplify = TRUE)) - 1
+  }
 
+folder_sub <- list.dirs(folder_main, recursive = T)
+
+# Filter the directories
+filtered_folders <- folder_sub[sapply(folder_sub, function(x) count_levels(x) == 7)] #CAREFUL WITH LEVELS, CHECK DIRECTORIES TO REFER TO A CORRECT PATH
+
+for (x in filtered_folders) { 
+  parts2 <- strsplit(x, "/")[[1]]
+  pointid <- trimws(parts2[length(parts2)])
+  
+  folders <- list.dirs(x, recursive = F)
+  
+  for (i in folders) {
+  parts <- strsplit(i, "/")[[1]]
+  last_part <- trimws(parts[length(parts)])
+    multiple_sounds(directory = i,
+                resultfile = paste0(i,"/",pointid,"_",last_part,"_",index ,".csv"),
+                              soundindex = index, max_freq = 12000, no_cores = "max")
+  }
+  
+  
+  # List all CSV files in the output folder
+  csv_files <- list.files(path = x, pattern = "*.csv", full.names = TRUE, recursive = T)
+  csv_files <- grep(paste0(index, ".csv$"), csv_files, value = T)
+  
+  # Read and combine all CSV files into one dataframe
+  combined_data <- do.call(rbind, lapply(csv_files, read.csv))
+  
+  # Write the combined data to a new CSV file
+  write.csv(combined_data, file = paste0(x,"/",pointid, "_", index,".csv"), row.names = FALSE)
+}
+}
+  
+  rm(list = ls())
+  
   #Analysis of many files (H entropy)
   
   # Step 1: Get a list of all files in the folder
@@ -65,9 +125,6 @@ multiple_sounds(directory = "/home/rb857/AUDIO/BINEREAN/BIT01/C1/BIT01C102/20240
   
   # Step 4: Export the dataframe as a CSV file
   write.csv(df, file = "output.csv", row.names = FALSE)
-  
-  #this is a testgtertrrtertrtr
-  
   
   
 #Sound raster
