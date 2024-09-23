@@ -1,7 +1,7 @@
 library(ggplot2)
 
 # Create the boxplot
-ggplot(df_full, aes(x = CROP_SETTING, y = LEFT_CHANNEL)) +
+ggplot(df, aes(x = CROP_SETTING, y = LEFT_CHANNEL)) +
   geom_boxplot(fill = "lightblue", outlier.color = "red", outlier.shape = 16, outlier.size = 2) +
   labs(title = "Boxplot of Values by Group",
        x = "Group",

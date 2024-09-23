@@ -1,39 +1,18 @@
-library(ggplot2)
-library(agricolae)
-library(car)
-library(FSA)
-library(Rmisc)
-library(nortest)
-library(openxlsx)
-library(dplyr)
 
-df <- read.csv("/home/rb857/audiomoth_acoustic_diversity.csv")
+# Step 3: Find mean acoustic diversity for each group and arrange from highest to lowest
+group_means <- df %>%
+  group_by(CROP_SETTING) %>%
+  summarise(mean_acoustic_diversity = mean(LEFT_CHANNEL)) %>%
+  arrange(desc(mean_acoustic_diversity))
 
-# Shapiro-Wilk test for normality
-shapiro_test <- shapiro.test(df$TD_asy_endemic)
-print(shapiro_test)
+# Display group means
+print(group_means)
 
-# Histogram and Q-Q plot for visual inspection
-hist(df$TD_asy, main = "Histogram of Species Richness", xlab = "Species Richness", col = "lightblue")
-qqnorm(df$TD_asy)
-qqline(df$TD_asy, col = "red")
-
-#Homogeneity test for continous explanatory variable using Breusch-pagan
-
-library(lmtest)
-
-# Fit a linear model
-model <- lm(TD_asy ~ coconut_density, data = df)
-
-# Perform the Breusch-Pagan test
-bp_test <- bptest(model)
-print(bp_test)
-
-# Plot residuals vs fitted values
-plot(model$fitted.values, resid(model),
-     xlab = "Fitted values",
-     ylab = "Residuals",
-     main = "Residuals vs Fitted Values Plot")
-abline(h = 0, col = "red")
-
-#If the residuals are randomly scattered around the horizontal line (at 0) without forming any specific pattern, it suggests homoscedasticity (constant variance).
+# Step 4: Visualization of the differences between the groups
+ggplot(df, aes(x = CROP_SETTING, y = LEFT_CHANNEL, fill = CROP_SETTING)) +
+  geom_boxplot() +
+  labs(title = "Acoustic Diversity Index Across Different Categories",
+       x = "Group",
+       y = "Acoustic Diversity Index") +
+  theme_minimal(base_size = 15) +
+  theme(legend.position = "none")

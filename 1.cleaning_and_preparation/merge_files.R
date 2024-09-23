@@ -37,7 +37,10 @@ merged_data <- do.call(rbind, df_list)
 library(openxlsx)
 
 habitat <- read.xlsx("/home/rb857/AUDIO/bird_survey_sulawesi_2024_23SEP24.xlsx", sheet = "HABITAT")
-df_full <- merge(merged_data, habitat[, c("pointid","CROP_SETTING")], by.x = "POINTID", by.y = "pointid", all.x = T)
+df <- read.csv("/home/rb857/audiomoth_acoustic_diversity.csv")
+
+
+df_full <- merge(df, habitat[, c("pointid","CROP_SETTING", "")], by.x = "POINTID", by.y = "pointid", all.x = T)
     
     
     
