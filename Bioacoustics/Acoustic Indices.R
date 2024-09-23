@@ -44,7 +44,7 @@ library(stringr)
   
 #check faulty wav files
   # Directory containing the .wav files
-  directory <- "/home/rb857/AUDIO/LOLAYAN"
+  directory <- "/home/rb857/AUDIO/TANGKOKO"
   
   # List all .wav files
   wav_files <- list.files(path = directory, pattern = "*.WAV$", full.names = TRUE, recursive = T)
@@ -54,7 +54,7 @@ library(stringr)
   file_sizes <- file_info$size
   
   # Define the size limit in bytes
-  size_limit <- 100 * 1024  # 100 KB in bytes
+  size_limit <- 1000 * 1024  # 100 KB in bytes
   
   # Find files smaller than the size limit
   small_files <- wav_files[file_sizes < size_limit]
@@ -63,8 +63,13 @@ library(stringr)
   print(small_files)
   
 #Analysis of many files
-  
-acoustic_indices <- function(index, folder_main) {
+f <- c(
+       "/home/rb857/AUDIO/AMBANG/AMT01",
+       "/home/rb857/AUDIO/AMBANG/AMT02",
+       "/home/rb857/AUDIO/AMBANG/AMT03")
+index <- "bioacoustic_index"
+
+  acoustic_indices <- function(index, folder_main) {
   count_levels <- function(path) {
     # Count the number of slashes in the path
     length(str_split(path, "/", simplify = TRUE)) - 1
@@ -86,7 +91,7 @@ for (x in filtered_folders) {
   last_part <- trimws(parts[length(parts)])
     multiple_sounds(directory = i,
                 resultfile = paste0(i,"/",pointid,"_",last_part,"_",index ,".csv"),
-                              soundindex = index, max_freq = 12000, no_cores = "max")
+                              soundindex = index, max_freq = 12000, min_freq = 1000, no_cores = 16)
   }
   
   
@@ -100,7 +105,11 @@ for (x in filtered_folders) {
   # Write the combined data to a new CSV file
   write.csv(combined_data, file = paste0(x,"/",pointid, "_", index,".csv"), row.names = FALSE)
 }
-}
+  }
+  
+  for (g in f) {
+    acoustic_indices(index, f)
+  }
   
   rm(list = ls())
   
