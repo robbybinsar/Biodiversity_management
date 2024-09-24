@@ -13,7 +13,7 @@
 #Path to folder
     folder_path <- "/home/rb857/AUDIO/acoustic_indices"
     # List all CSV files in the folder with the pattern *_INDEXNAME.csv
-    file_list <- list.files(path = folder_path, pattern = "*T0[1-3]C[1-3]0[1-3]+_acoustic_diversity\\.csv", full.names = T)
+    file_list <- list.files(path = folder_path, pattern = "*T0[1-3]C[1-3]0[1-3]+_bioacoustic_index\\.csv", full.names = T)
     # Create an empty list to store the data frames
     df_list <- list()
     # Loop through each file, read it, and extract POINTID
@@ -31,16 +31,22 @@
     
 # Combine all data frames into one
 merged_data <- do.call(rbind, df_list)
+merged_data <- merged_data[!duplicated(merged_data),]
     
 
 # Add axillary variables
 library(openxlsx)
 
 habitat <- read.xlsx("/home/rb857/AUDIO/bird_survey_sulawesi_2024_23SEP24.xlsx", sheet = "HABITAT")
-df <- read.csv("/home/rb857/audiomoth_acoustic_diversity.csv")
+df_full <- merge(merged_data, habitat[, c("pointid","CROP_SETTING")], by.x = "POINTID", by.y = "pointid", all.x = T)
+
+library(dplyr)
+df_pooled <- cek %>%
+  group_by(POINTID, CROP_SETTING) %>%
+  dplyr::summarise(index = mean(byminute, na.rm = TRUE))
 
 
-df_full <- merge(df, habitat[, c("pointid","CROP_SETTING", "")], by.x = "POINTID", by.y = "pointid", all.x = T)
+
     
     
     

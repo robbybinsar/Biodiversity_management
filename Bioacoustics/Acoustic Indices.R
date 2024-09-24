@@ -44,10 +44,10 @@ library(stringr)
   
 #check faulty wav files
   # Directory containing the .wav files
-  directory <- "/home/rb857/AUDIO/TANGKOKO"
+  directory <- "/home/rb857/AUDIO"
   
   # List all .wav files
-  wav_files <- list.files(path = directory, pattern = "*.WAV$", full.names = TRUE, recursive = T)
+  wav_files <- list.files(path = directory, pattern = "*.WAV$", full.names = F, recursive = T)
   
   # Get file sizes
   file_info <- file.info(wav_files)
@@ -99,8 +99,18 @@ for (x in filtered_folders) {
   csv_files <- list.files(path = x, pattern = "*.csv", full.names = TRUE, recursive = T)
   csv_files <- grep(paste0(index, ".csv$"), csv_files, value = T)
   
-  # Read and combine all CSV files into one dataframe
-  combined_data <- do.call(rbind, lapply(csv_files, read.csv))
+  # Function to safely read CSVs and handle possible issues
+  read_and_clean_csv <- function(file) {
+    df <- read.csv(file, stringsAsFactors = FALSE)  # Read CSV without factors
+    df[] <- lapply(df, function(col) if (is.character(col)) trimws(col) else col)  # Trim whitespace from character columns
+    return(df)
+  }
+  
+  # Alternative method to combine CSVs into one dataframe and remove any duplicates
+  combined_data <- do.call(rbind, lapply(csv_files, read_and_clean_csv))
+  
+  # Remove duplicate rows across all columns
+  combined_data <- combined_data[!duplicated(combined_data), ]
   
   # Write the combined data to a new CSV file
   write.csv(combined_data, file = paste0(x,"/",pointid, "_", index,".csv"), row.names = FALSE)
