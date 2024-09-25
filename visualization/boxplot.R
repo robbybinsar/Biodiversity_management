@@ -1,9 +1,9 @@
 library(ggplot2)
 library(dplyr)
 
-df_ADI <- read.csv("/home/rb857/Biodiversity_management/acoustic_diversity_pointid.csv")
-df_BIO <- read.csv("/home/rb857/Biodiversity_management/bioacoustic_index_pointid.csv")
-df_ACI <- read.csv("/home/rb857/Biodiversity_management/acoustic_complexity_pointid.csv")
+df_ADI <- read.csv("/Biodiversity_management/acoustic_diversity_pointid.csv")
+df_BIO <- read.csv("/Biodiversity_management/bioacoustic_index_pointid.csv")
+df_ACI <- read.csv("/Biodiversity_management/acoustic_complexity_pointid.csv")
 #iNDIVIDUAL
     # Create the boxplot
     ggplot(df_ACI, aes(x = CROP_SETTING, y = index)) +
@@ -32,15 +32,19 @@ df_ACI <- read.csv("/home/rb857/Biodiversity_management/acoustic_complexity_poin
                   ACI = "Acoustic Complexity Index (ACI)")
     
     # Create the box plot with facets, independent y-axes, and custom y-axis labels
-    ggplot(df_combined, aes(x = CROP_SETTING, y = index, fill = CROP_SETTING)) +
-      geom_boxplot(outlier.color = "black", outlier.shape = 16, outlier.size = 2) +
-      scale_fill_manual(values = c("red", "green", "blue")) +  # Custom colours for CROP_SETTING
-      labs(title = "Boxplots of Acoustic Diversity Indices",
-           x = "Crop Setting",
-           y = NULL) +  # Remove global y-axis label
+    ggplot(df_combined, aes( y = index, fill = CROP_SETTING)) +
+      geom_boxplot(outlier.color = "black", outlier.shape = 16, outlier.size = 2, alpha = 0.7) +
+      scale_fill_manual(values = c("#135222", "#7050FF", "#800022"),
+                        labels = c("FOREST" = "Forest", 
+                                   "INTERCROP" = "Intercropping", 
+                                   "MONO" = "Monocropping")) +  # Custom colours for CROP_SETTING
+      labs(#title = "Boxplots of Acoustic Diversity Indices",
+           #x = "Crop Setting",
+           y = NULL,
+           fill = "Habitat") +  # Remove global y-axis label
       theme_minimal(base_size = 15) +  # Minimal theme with adjusted base size
-      theme(axis.text.x = element_text(size = 12),  # Adjust x-axis text size
-            axis.text.y = element_text(size = 12),  # Adjust y-axis text size
+      theme(axis.text.x = element_blank(),  # Adjust x-axis text size
+            axis.text.y = element_text(size = 9),  # Adjust y-axis text size
             plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),  # Center and format title
             legend.position = "bottom") +  # Position the legend at the bottom
       facet_wrap(~ index_type, scales = "free_y", nrow = 1, 
